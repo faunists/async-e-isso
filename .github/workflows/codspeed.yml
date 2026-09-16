@@ -54,8 +54,19 @@ jobs:
       # single-threaded benchmarks and +70% to +115% on the ones that spawn
       # threads (mimalloc initializes a heap per thread). Mixing allocators
       # would show up as a fake free-threading regression.
+      #
+      # Every push measures the three instruments in a row:
+      # - `simulation`: deterministic CPU simulation, the most stable signal.
+      # - `walltime`: real elapsed time, the only instrument that can show the
+      #   parallelism the free-threaded build unlocks. This repository lives
+      #   under a personal account, so CodSpeed macro runners are unavailable
+      #   and walltime runs on a shared GitHub runner: expect noticeably more
+      #   variance than with simulation.
+      # - `memory`: allocation tracking. Since both interpreters run on
+      #   mimalloc, the reported allocations are arena-level rather than
+      #   per-object, but they stay comparable between the two branches.
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v5
         with:
-          mode: simulation
+          mode: simulation,walltime,memory
           run: env PYTHONMALLOC=mimalloc uv run pytest tests/ --codspeed
