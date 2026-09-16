@@ -27,7 +27,10 @@ jobs:
       - name: Resolve Python version
         id: python
         env:
-          BRANCH: ${{ github.head_ref || github.ref_name }}
+          # On pull requests the target branch decides the interpreter, so that
+          # a PR is always measured with the same Python as the branch it will
+          # be merged into.
+          BRANCH: ${{ github.base_ref || github.ref_name }}
         run: |
           case "$BRANCH" in
             without-gil)
