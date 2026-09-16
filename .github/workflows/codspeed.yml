@@ -2,8 +2,9 @@ name: CodSpeed
 
 on:
   push:
-    branches: [ main, with-gil, without-gil ]
+    branches: [ with-gil, without-gil ]
   pull_request:
+    branches: [ with-gil, without-gil ]
   # `workflow_dispatch` allows CodSpeed to trigger backtest
   # performance analysis in order to generate initial data.
   workflow_dispatch:
@@ -20,10 +21,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # `with-gil` runs on the regular interpreter, `without-gil` on the
+      # free-threaded one. The free-threaded build does not support the
+      # `malloc` allocator CodSpeed uses by default, so it uses `mimalloc`.
+      - name: Resolve Python version
+        id: python
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          case "$BRANCH" in
+            without-gil)
+              version="3.14.7t"
+              allocator="mimalloc"
+              ;;
+            *)
+              version="3.14.7"
+              allocator="malloc"
+              ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "allocator=$allocator" >> "$GITHUB_OUTPUT"
+
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
-          python-version: "3.14"
+          python-version: ${{ steps.python.outputs.version }}
           enable-cache: true
 
       - name: Install dependencies
@@ -33,4 +55,4 @@ jobs:
         uses: CodSpeedHQ/action@v5
         with:
           mode: simulation
-          run: uv run pytest tests/ --codspeed
+          run: env PYTHONMALLOC=${{ steps.python.outputs.allocator }} uv run pytest tests/ --codspeed
