@@ -14,7 +14,10 @@ permissions:
 jobs:
   benchmarks:
     name: Run benchmarks
-    runs-on: ubuntu-latest
+    # CodSpeed macro runners: dedicated, tuned machines required for reliable
+    # `walltime` measurements. They are only available to repositories owned by
+    # an organization.
+    runs-on: codspeed-macro
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -58,10 +61,9 @@ jobs:
       # Every push measures the three instruments in a row:
       # - `simulation`: deterministic CPU simulation, the most stable signal.
       # - `walltime`: real elapsed time, the only instrument that can show the
-      #   parallelism the free-threaded build unlocks. This repository lives
-      #   under a personal account, so CodSpeed macro runners are unavailable
-      #   and walltime runs on a shared GitHub runner: expect noticeably more
-      #   variance than with simulation.
+      #   parallelism the free-threaded build unlocks. It runs on a CodSpeed
+      #   macro runner (see `runs-on`), which keeps the measurement noise low
+      #   enough for that comparison to be meaningful.
       # - `memory`: allocation tracking. Since both interpreters run on
       #   mimalloc, the reported allocations are arena-level rather than
       #   per-object, but they stay comparable between the two branches.
