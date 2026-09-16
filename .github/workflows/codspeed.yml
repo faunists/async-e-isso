@@ -43,12 +43,15 @@ jobs:
           case "$BRANCH" in
             without-gil)
               version="3.14.7t"
+              free_threaded="1"
               ;;
             *)
               version="3.14.7"
+              free_threaded="0"
               ;;
           esac
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "free_threaded=$free_threaded" >> "$GITHUB_OUTPUT"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -58,6 +61,24 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --locked
+
+      # The whole comparison is meaningless if the job runs the wrong build, and
+      # a free-threaded interpreter still reports itself as `3.14.7`. Fail here
+      # rather than publish numbers attributed to the wrong branch.
+      - name: Check the interpreter matches the branch
+        env:
+          EXPECTED: ${{ steps.python.outputs.free_threaded }}
+        run: |
+          uv run python -c "
+          import os, sys, sysconfig
+          expected = os.environ['EXPECTED'] == '1'
+          actual = bool(sysconfig.get_config_var('Py_GIL_DISABLED'))
+          print(sys.version)
+          if actual is not expected:
+              raise SystemExit(
+                  f'expected free-threaded={expected}, got free-threaded={actual}'
+              )
+          "
 
       # Both branches use `mimalloc`: the free-threaded build rejects the
       # `malloc` allocator CodSpeed sets by default, so `mimalloc` is the only
