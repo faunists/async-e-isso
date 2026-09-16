@@ -17,7 +17,15 @@ jobs:
     # CodSpeed macro runners: dedicated, tuned machines required for reliable
     # `walltime` measurements. They are only available to repositories owned by
     # an organization.
-    runs-on: codspeed-macro
+    #
+    # Two machines exist; this job pins the Graviton one by its full label
+    # (`codspeed-macro` is the legacy alias of that same machine). It is bare
+    # metal with 16 real cores and no SMT, which is what the thread benchmarks
+    # need, and it is the runner available on every plan. The other machine,
+    # `codspeed-macro-x86-ryzen-9950x-ubuntu-24-04`, is Pro/Enterprise only.
+    # Results are only comparable across runs on the same machine, so this
+    # label should stay stable over time.
+    runs-on: codspeed-macro-arm64-graviton-ubuntu-22-04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
