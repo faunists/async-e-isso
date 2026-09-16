@@ -33,7 +33,8 @@ How to read the results on CodSpeed:
 Adding a new case
 -----------------
 
-Copy ``tests/test_cache_benchmarks.py`` and change three things:
+Copy the skeleton in ``tests/README.md`` (or any existing
+``tests/test_*_benchmarks.py``) and change three things:
 
 - ``work(worker_id, units)``: the code under study, doing ``units`` units of
   work. It must be splittable, i.e. calling it once with 100 units has to be
