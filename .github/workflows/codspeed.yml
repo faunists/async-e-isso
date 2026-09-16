@@ -48,9 +48,12 @@ jobs:
         run: uv sync --locked
 
       # Both branches use `mimalloc`: the free-threaded build rejects the
-      # `malloc` allocator CodSpeed sets by default, and mixing allocators
-      # would add an allocator difference on top of the GIL difference
-      # (measured here at -18% to +11% on the same interpreter).
+      # `malloc` allocator CodSpeed sets by default, so `mimalloc` is the only
+      # allocator both interpreters share. Keeping it identical matters a lot:
+      # on 3.14.7, switching malloc -> mimalloc alone costs +1-2% on the
+      # single-threaded benchmarks and +70% to +115% on the ones that spawn
+      # threads (mimalloc initializes a heap per thread). Mixing allocators
+      # would show up as a fake free-threading regression.
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v5
         with:
