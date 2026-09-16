@@ -19,7 +19,8 @@ from scaling import benchmark_scaling, scaling_threads
 
 #: One unit is 1000 iterations of the loop below, ~40 µs. 1600 units are worth
 #: a few tens of milliseconds of single threaded work, on par with the other
-#: cases.
+#: cases, and split evenly across every thread count of the sweep (50 units
+#: each at 32 threads, still far above thread startup).
 TOTAL_UNITS = 1600
 
 

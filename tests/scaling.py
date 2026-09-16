@@ -10,16 +10,20 @@ The answer depends on the nature of the code, and that is the whole point of
 the talk. To make the comparison readable, every case follows the same rules:
 
 1. **The total amount of work is constant.** ``1-thread`` is the sequential
-   baseline and ``8-threads`` splits the very same work in eight. A benchmark
-   whose time goes down when threads go up is really running in parallel; one
-   that stays flat is serialized (by the GIL, by a lock, or by contention on
-   shared state). If every thread did a full workload instead, the numbers
-   would mix "more work" with "more parallelism" and could not be read.
+   baseline and ``32-threads`` splits the very same work in thirty-two. A
+   benchmark whose time goes down when threads go up is really running in
+   parallel; one that stays flat is serialized (by the GIL, by a lock, or by
+   contention on shared state). If every thread did a full workload instead,
+   the numbers would mix "more work" with "more parallelism" and could not be
+   read.
 2. **The workers start together.** A barrier releases all the threads at the
    same time, so the measured region is the parallel phase instead of a
    staircase of threads starting one after another.
 3. **Only the workload changes between cases.** Same harness, same thread
    counts, same total work, so two cases can be compared side by side.
+4. **The sweep goes past the number of cores.** The last two points (``16`` and
+   ``32`` workers on a 16-core runner) add no parallelism, only coordination:
+   they measure what the code pays when the threads have to share the cores.
 
 How to read the results on CodSpeed:
 
@@ -41,8 +45,8 @@ Copy the skeleton in ``tests/README.md`` (or any existing
   equivalent to calling it twice with 50.
 - ``TOTAL_UNITS``: how many units make up one benchmark run. Pick a number
   divisible by ``max(THREAD_COUNTS)`` and big enough that one run takes a few
-  tens of milliseconds, otherwise thread startup (~1-2 ms for 8 threads)
-  dominates the measurement and hides the effect.
+  tens of milliseconds, otherwise thread startup (~1-2 ms for 8 threads, ~5 ms
+  for 32) dominates the measurement and hides the effect.
 - ``setup``/assertions: whatever the case needs to start from a clean state.
 """
 
@@ -53,9 +57,16 @@ from typing import Final
 import pytest
 
 #: Thread counts every case is measured with. ``1`` is the sequential
-#: baseline; the CodSpeed macro runner the workflow uses has 16 real cores, so
-#: up to 8 workers stay away from oversubscription.
-THREAD_COUNTS: Final = (1, 2, 4, 8)
+#: baseline; the CodSpeed macro runner the workflow uses has 16 real cores with
+#: no SMT, so the sweep covers the three regimes that matter:
+#:
+#: - ``2`` to ``8``: fewer workers than cores, each one can run on its own core.
+#: - ``16``: exactly one worker per core, the best case for parallel code.
+#: - ``32``: twice as many workers as cores, so the OS has to time-slice them.
+#:   Nothing new is parallelized past this point, only coordination is added
+#:   (context switches, scheduling, more contention on whatever is shared), so
+#:   this is where a case shows what oversubscription costs it.
+THREAD_COUNTS: Final = (1, 2, 4, 8, 16, 32)
 
 #: Applies ``THREAD_COUNTS`` to a test, naming the cases ``[1-thread]``,
 #: ``[2-threads]``, ... so the sweep is readable in the CodSpeed dashboard.

@@ -26,9 +26,10 @@ from async_e_isso import cache as cache_module
 from scaling import benchmark_scaling, run_in_threads, scaling_threads
 
 #: One unit of work is one ``process_data`` call, i.e. 1000 lookups in the
-#: shared cache. 400 units take a few tens of milliseconds, which keeps thread
-#: creation (~1-2 ms for 8 threads) a small part of the measurement.
-TOTAL_UNITS = 400
+#: shared cache. 384 units take a few tens of milliseconds, which keeps thread
+#: creation (~1-2 ms for 8 threads, ~5 ms for 32) a small part of the
+#: measurement, and they split evenly across every thread count of the sweep.
+TOTAL_UNITS = 384
 
 _cache_lock = threading.Lock()
 

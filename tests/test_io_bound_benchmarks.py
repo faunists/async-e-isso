@@ -24,10 +24,12 @@ import time
 
 from scaling import benchmark_scaling, scaling_threads
 
-#: One unit is one 1 ms sleep, so a run is ~200 ms of waiting when sequential.
+#: One unit is one 1 ms sleep, so a run is ~256 ms of waiting when sequential.
 #: The unit is deliberately short: a single long sleep would not be splittable
-#: across threads, while 200 small ones are.
-TOTAL_UNITS = 200
+#: across threads, while 256 small ones are — and 256 divides evenly across
+#: every thread count of the sweep, down to 8 ms of waiting per worker at 32
+#: threads.
+TOTAL_UNITS = 256
 
 
 def wait(worker_id: int, units: int) -> None:

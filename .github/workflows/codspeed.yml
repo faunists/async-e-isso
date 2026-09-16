@@ -21,11 +21,13 @@ jobs:
     # Two machines exist; this job pins the Graviton one by its full label
     # (`codspeed-macro` is the legacy alias of that same machine, so both are
     # valid and land here). It is bare metal, arm64, 16 real cores with no SMT
-    # — enough for the 10-thread benchmarks — and it is the only one available
-    # on every plan, with 600 free minutes per month. The other machine,
-    # `codspeed-macro-x86-ryzen-9950x-ubuntu-24-04` (16c/32t, Ubuntu 24.04), is
-    # not available on the free plan. Results are only comparable across runs
-    # on the same machine, so this label should stay stable over time.
+    # — the benchmarks sweep 1 to 32 threads, so 16 is the "one worker per
+    # core" point and 32 is deliberate oversubscription — and it is the only
+    # one available on every plan, with 600 free minutes per month. The other
+    # machine, `codspeed-macro-x86-ryzen-9950x-ubuntu-24-04` (16c/32t, Ubuntu
+    # 24.04), is not available on the free plan. Results are only comparable
+    # across runs on the same machine, so this label should stay stable over
+    # time.
     runs-on: codspeed-macro-arm64-graviton-ubuntu-22-04
     steps:
       - name: Checkout
