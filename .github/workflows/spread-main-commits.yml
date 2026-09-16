@@ -1,0 +1,43 @@
+name: spread-main-commits
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  merge-main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git Author
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Spread Commits
+        run: |
+          TARGET_BRANCHES=("with-gil" "without-gil")
+          
+          for BRANCH in "${TARGET_BRANCHES[@]}"; do
+            echo "::group::Merging into $BRANCH"
+
+            if git ls-remote --exit-code --heads origin $BRANCH; then
+              echo "Branch $BRANCH exists on remote, checking out and merging"
+              git checkout $BRANCH
+              git merge main --ff-only
+            else
+              echo "Branch $BRANCH does not exist on remote, creating from main"
+              git checkout -b $BRANCH main
+            fi
+
+            git push -u origin $BRANCH
+            
+            echo "::endgroup::"
+          done
