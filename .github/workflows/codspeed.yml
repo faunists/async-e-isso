@@ -20,8 +20,8 @@ jobs:
         uses: actions/checkout@v7
 
       # `with-gil` runs on the regular interpreter, `without-gil` on the
-      # free-threaded one. The free-threaded build does not support the
-      # `malloc` allocator CodSpeed uses by default, so it uses `mimalloc`.
+      # free-threaded one. The interpreter must be the only difference between
+      # the two branches, so both pin the same allocator (see the run step).
       - name: Resolve Python version
         id: python
         env:
@@ -31,15 +31,12 @@ jobs:
           case "$BRANCH" in
             without-gil)
               version="3.14.7t"
-              allocator="mimalloc"
               ;;
             *)
               version="3.14.7"
-              allocator="malloc"
               ;;
           esac
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "allocator=$allocator" >> "$GITHUB_OUTPUT"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -50,8 +47,12 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # Both branches use `mimalloc`: the free-threaded build rejects the
+      # `malloc` allocator CodSpeed sets by default, and mixing allocators
+      # would add an allocator difference on top of the GIL difference
+      # (measured here at -18% to +11% on the same interpreter).
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v5
         with:
           mode: simulation
-          run: env PYTHONMALLOC=${{ steps.python.outputs.allocator }} uv run pytest tests/ --codspeed
+          run: env PYTHONMALLOC=mimalloc uv run pytest tests/ --codspeed
