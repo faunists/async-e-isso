@@ -1,0 +1,106 @@
+name: CodSpeed
+
+on:
+  push:
+    branches: [ with-gil, without-gil ]
+  # `workflow_dispatch` allows CodSpeed to trigger backtest
+  # performance analysis in order to generate initial data.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # for OpenID Connect authentication with CodSpeed
+
+jobs:
+  benchmarks:
+    name: Run benchmarks
+    # CodSpeed macro runners: dedicated, tuned machines required for reliable
+    # `walltime` measurements. They are only available to repositories owned by
+    # an organization.
+    #
+    # Two machines exist; this job pins the Graviton one by its full label
+    # (`codspeed-macro` is the legacy alias of that same machine, so both are
+    # valid and land here). It is bare metal, arm64, 16 real cores with no SMT
+    # — the benchmarks sweep 1 to 32 threads, so 16 is the "one worker per
+    # core" point and 32 is deliberate oversubscription — and it is the only
+    # one available on every plan, with 600 free minutes per month. The other
+    # machine, `codspeed-macro-x86-ryzen-9950x-ubuntu-24-04` (16c/32t, Ubuntu
+    # 24.04), is not available on the free plan. Results are only comparable
+    # across runs on the same machine, so this label should stay stable over
+    # time.
+    runs-on: codspeed-macro-arm64-graviton-ubuntu-22-04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # `with-gil` runs on the regular interpreter, `without-gil` on the
+      # free-threaded one. The interpreter must be the only difference between
+      # the two branches, so both pin the same allocator (see the run step).
+      - name: Resolve Python version
+        id: python
+        env:
+          # The branch being built decides the interpreter.
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          case "$BRANCH" in
+            without-gil)
+              version="3.14.7t"
+              free_threaded="1"
+              ;;
+            *)
+              version="3.14.7"
+              free_threaded="0"
+              ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "free_threaded=$free_threaded" >> "$GITHUB_OUTPUT"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ steps.python.outputs.version }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # The whole comparison is meaningless if the job runs the wrong build, and
+      # a free-threaded interpreter still reports itself as `3.14.7`. Fail here
+      # rather than publish numbers attributed to the wrong branch.
+      - name: Check the interpreter matches the branch
+        env:
+          EXPECTED: ${{ steps.python.outputs.free_threaded }}
+        run: |
+          uv run python -c "
+          import os, sys, sysconfig
+          expected = os.environ['EXPECTED'] == '1'
+          actual = bool(sysconfig.get_config_var('Py_GIL_DISABLED'))
+          print(sys.version)
+          if actual is not expected:
+              raise SystemExit(
+                  f'expected free-threaded={expected}, got free-threaded={actual}'
+              )
+          "
+
+      # Both branches use `mimalloc`: the free-threaded build rejects the
+      # `malloc` allocator CodSpeed sets by default, so `mimalloc` is the only
+      # allocator both interpreters share. Keeping it identical matters a lot:
+      # on 3.14.7, switching malloc -> mimalloc alone costs +1-2% on the
+      # single-threaded benchmarks and +70% to +115% on the ones that spawn
+      # threads (mimalloc initializes a heap per thread). Mixing allocators
+      # would show up as a fake free-threading regression.
+      #
+      # Every push measures the three instruments in a row:
+      # - `simulation`: deterministic CPU simulation, the most stable signal.
+      # - `walltime`: real elapsed time, the only instrument that can show the
+      #   parallelism the free-threaded build unlocks. It runs on a CodSpeed
+      #   macro runner (see `runs-on`), which keeps the measurement noise low
+      #   enough for that comparison to be meaningful.
+      # - `memory`: allocation tracking. Since both interpreters run on
+      #   mimalloc, the reported allocations are arena-level rather than
+      #   per-object, but they stay comparable between the two branches.
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@v5
+        with:
+          mode: simulation,walltime,memory
+          run: env PYTHONMALLOC=mimalloc uv run pytest tests/ --codspeed

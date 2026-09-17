@@ -35,4 +35,5 @@ module-root = ""
 [dependency-groups]
 dev = [
     "pytest>=9.1",
+    "pytest-codspeed>=5.0.3",
 ]
